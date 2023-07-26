@@ -4,6 +4,7 @@
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.5
+REPLACE_VERSION ?= 0.0.5
 IMG_VERSION ?= latest
 
 LINT_GOGC := 10
@@ -302,6 +303,12 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+
+.PHONY: bundle/hub
+bundle/hub: bundle ## Generate bundle manifests for Operator Hub.
+	RE="kaoto-operator.$(REPLACE_VERSION)" $(YQ) -i '.spec.replaces = strenv(RE) | . style="double"' bundle/manifests/kaoto-operator.clusterserviceversion.yaml
+	mv bundle/manifests/kaoto-operator.clusterserviceversion.yaml bundle/manifests/kaoto-operator.$(VERSION).clusterserviceversion.yaml
+
 
 .PHONY: opm
 OPM = ./bin/opm

@@ -1,0 +1,103 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The version of the bundle"
+        required: true
+        type: string
+      replaces-version:
+        description: "The version this bundle replaces"
+        required: true
+        type: string
+      operator-version:
+        description: "The operator tag"
+        required: true
+        type: string
+
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      REPLACE_VERSION: ${{ inputs.replaces-version }}
+      IMG: ${{ inputs.operator-image }}
+      USE_IMAGE_DIGESTS: true
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+        with:
+          repository: "kaotoio/kaoto-operator"
+          ref: ${{ inputs.operator-version }}
+          path: "kaoto-operator"
+
+      - name: "Set up Go"
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+      - name: "Build Bundle"
+        run: |
+          cd "${GITHUB_WORKSPACE}/kaoto-operator"
+          make bundle/hub
+
+      #
+      # k8s community operators
+      #
+      - name: "k8s community operators - checkout"
+        uses: actions/checkout@v3
+        with:
+          repository: "k8s-operatorhub/community-operators"
+          path: "community-operators-k8s"
+      - name: "k8s community operators - prepare"
+        run: |
+          cp -r \
+            "${GITHUB_WORKSPACE}/kaoto-operator/bundle" \
+            "${GITHUB_WORKSPACE}/community-operators-k8s/operators/kaoto-operator/${{ inputs.version}}"
+
+      - name: "k8s community operators - pr"
+        run: |
+          cd "${GITHUB_WORKSPACE}/community-operators-k8s
+          
+          BUNDLE_PATH=${GITHUB_WORKSPACE}/community-operators-k8s/operators/kaoto-operator/${{ inputs.version}}"
+          
+          git add "${BUNDLE_PATH}"
+          git commit -m "kaoto-operator ${{ inputs.version }}" "${BUNDLE_PATH}"
+          
+          gh config set prompt disabled
+
+          gh pr create \
+            --fill \
+            --base main \
+            --title "kaoto-operator ${{ inputs.version }}"
+
+      #
+      # openshift community operators
+      #
+      - name: "openshift community operators - checkout"
+        uses: actions/checkout@v3
+        with:
+          repository: "redhat-openshift-ecosystem/community-operators-prod"
+          path: "community-operators-openshift"
+      - name: "openshift community operators - prepare"
+        run: |
+          cp -r \
+            "${GITHUB_WORKSPACE}/kaoto-operator/bundle" \
+            "${GITHUB_WORKSPACE}/community-operators-openshift/operators/kaoto-operator/${{ inputs.version}}" 
+
+      - name: "openshift community operators - pr"
+        run: |
+          cd "${GITHUB_WORKSPACE}/community-operators-openshift
+          
+          BUNDLE_PATH=${GITHUB_WORKSPACE}/community-operators-openshift/operators/kaoto-operator/${{ inputs.version}}"
+          
+          git add "${BUNDLE_PATH}"
+          git commit -m "kaoto-operator ${{ inputs.version }}" "${BUNDLE_PATH}"
+          
+          gh config set prompt disabled
+
+          gh pr create \
+            --fill \
+            --base main \
+            --title "kaoto-operator ${{ inputs.version }}"
